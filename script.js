@@ -34,5 +34,5 @@ async function fetchDataAndPopulateTable(url) {
 }
 
 // Call the function with the provided URL
-const dataUrl = 'https://compute.samford.edu/zohauth/datajson';
+const dataUrl = 'https://compute.samford.edu/zohauth/clients/datajson';
 fetchDataAndPopulateTable(dataUrl);

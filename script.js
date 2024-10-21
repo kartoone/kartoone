@@ -25,6 +25,7 @@ async function fetchDataAndPopulateTable(url) {
               <td><a href="details.html">${item.id}</a></td>
               <td>${item.speed}</td>
               <td>${item.result || '--'}</td>
+              <td>${item.datetime || '--'}</td>
           `;
           tableBody.appendChild(row);
       });

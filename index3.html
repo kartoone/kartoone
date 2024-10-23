@@ -17,12 +17,21 @@
             border-bottom: 1px solid gray;
             font-weight: bold;
             font-size: 1.2em;
-            cursor: pointer; /* Indicate that table headers are clickable */
+            cursor: pointer;
+        }
+
+        th.sorted-asc::after {
+            content: " ↑"; /* Ascending sort indicator */
+        }
+
+        th.sorted-desc::after {
+            content: " ↓"; /* Descending sort indicator */
         }
 
         a {
             text-decoration: none;
         }
+
         a:hover {
             text-decoration: underline;
         }
@@ -35,18 +44,19 @@
             width: 100%;
             border-collapse: collapse;
         }
+
         th, td {
             border: 1px solid #ddd;
             padding: 8px;
         }
+
         th {
             background-color: #f2f2f2;
         }
-        .sorted-asc {
-            background-color: #e7f1ff; /* Light blue for ascending */
-        }
-        .sorted-desc {
-            background-color: #ffebee; /* Light red for descending */
+
+        .stats {
+            margin-top: 20px;
+            font-weight: bold;
         }
     </style>
 </head>
@@ -73,10 +83,9 @@
         </tbody>
     </table>
 
-    <script>
-        let currentSortColumn = -1; // Track the currently sorted column
-        let sortDirection = 'asc'; // Track sort direction
+    <div class="stats" id="stats"></div>
 
+    <script>
         function filterData(event) {
             event.preventDefault();
 
@@ -85,59 +94,113 @@
             var tableRows = document.querySelectorAll('#data-table tbody tr');
 
             tableRows.forEach(row => {
-                var datetimeCell = row.cells[3].textContent; // Assuming the datetime is in the 4th cell
+                var datetimeCell = row.cells[3].textContent; 
                 var rowDate = new Date(datetimeCell);
 
                 if (rowDate >= startdate && rowDate <= enddate) {
-                    row.style.display = ''; // Show the row
+                    row.style.display = ''; 
                 } else {
-                    row.style.display = 'none'; // Hide the row
+                    row.style.display = 'none'; 
                 }
             });
+            calculateStats(); // Recalculate stats after filtering
         }
+
+        let currentSort = { index: -1, order: 'asc' };
 
         function sortTable(columnIndex) {
-            const tableBody = document.getElementById('data-table').querySelector('tbody');
-            const rows = Array.from(tableBody.rows);
+            const table = document.getElementById('data-table');
+            const tbody = table.querySelector('tbody');
+            const rows = Array.from(tbody.rows);
+            const isAscending = (currentSort.index === columnIndex && currentSort.order === 'asc') ? false : true;
 
-            // Determine sort direction
-            if (currentSortColumn === columnIndex) {
-                sortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
-            } else {
-                sortDirection = 'asc';
-            }
-            currentSortColumn = columnIndex;
+            // Sort rows based on the specified column
+            rows.sort((rowA, rowB) => {
+                const cellA = rowA.cells[columnIndex].textContent;
+                const cellB = rowB.cells[columnIndex].textContent;
 
-            // Sort rows
-            rows.sort((a, b) => {
-                const aText = a.cells[columnIndex].textContent.trim();
-                const bText = b.cells[columnIndex].textContent.trim();
-                
-                if (columnIndex === 1) { // Speed (numeric sort)
-                    return sortDirection === 'asc' ? parseFloat(aText) - parseFloat(bText) : parseFloat(bText) - parseFloat(aText);
-                } else if (columnIndex === 3) { // Datetime (date sort)
-                    return sortDirection === 'asc' ? new Date(aText) - new Date(bText) : new Date(bText) - new Date(aText);
-                } else { // Default string sort
-                    return sortDirection === 'asc' ? aText.localeCompare(bText) : bText.localeCompare(aText);
+                if (columnIndex === 0) { // ID
+                    return isAscending ? cellA.localeCompare(cellB) : cellB.localeCompare(cellA);
+                } else if (columnIndex === 1) { // Speed
+                    return isAscending ? parseFloat(cellA) - parseFloat(cellB) : parseFloat(cellB) - parseFloat(cellA);
+                } else if (columnIndex === 2) { // Result
+                    return isAscending ? cellA.localeCompare(cellB) : cellB.localeCompare(cellA);
+                } else if (columnIndex === 3) { // Datetime
+                    return isAscending ? new Date(cellA) - new Date(cellB) : new Date(cellB) - new Date(cellA);
                 }
             });
 
-            // Clear existing table body and append sorted rows
-            tableBody.innerHTML = '';
-            rows.forEach(row => tableBody.appendChild(row));
+            // Clear and append sorted rows to tbody
+            tbody.innerHTML = '';
+            rows.forEach(row => tbody.appendChild(row));
 
-            // Update header styles
-            updateHeaderStyles(columnIndex);
+            // Update current sort state
+            currentSort.index = columnIndex;
+            currentSort.order = isAscending ? 'asc' : 'desc';
+
+            // Reset sort classes
+            Array.from(table.querySelectorAll('th')).forEach(th => {
+                th.classList.remove('sorted-asc', 'sorted-desc');
+            });
+
+            // Add sorting class to the current header
+            table.querySelectorAll('th')[columnIndex].classList.add(isAscending ? 'sorted-asc' : 'sorted-desc');
+
+            calculateStats(); // Recalculate stats after sorting
         }
 
-        function updateHeaderStyles(sortedColumn) {
-            const headers = document.querySelectorAll('#data-table th');
-            headers.forEach((header, index) => {
-                header.classList.remove('sorted-asc', 'sorted-desc');
-                if (index === sortedColumn) {
-                    header.classList.add(sortDirection === 'asc' ? 'sorted-asc' : 'sorted-desc');
+        function calculateStats() {
+            const tableBody = document.getElementById('data-table').querySelector('tbody');
+            const rows = Array.from(tableBody.rows);
+            const speeds = [];
+
+            rows.forEach(row => {
+                const speed = parseFloat(row.cells[1].textContent);
+                if (!isNaN(speed)) {
+                    speeds.push(speed);
                 }
             });
+
+            if (speeds.length > 0) {
+                const mean = speeds.reduce((a, b) => a + b, 0) / speeds.length;
+                const median = calculateMedian(speeds);
+                const mode = calculateMode(speeds);
+
+                document.getElementById('stats').innerHTML = `
+                    Mean Speed: ${mean.toFixed(2)}<br>
+                    Median Speed: ${median.toFixed(2)}<br>
+                    Mode Speed: ${mode.join(', ')}
+                `;
+            } else {
+                document.getElementById('stats').innerHTML = 'No data available for statistics.';
+            }
+        }
+
+        function calculateMedian(arr) {
+            const sorted = arr.slice().sort((a, b) => a - b);
+            const mid = Math.floor(sorted.length / 2);
+            return sorted.length % 2 !== 0 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+        }
+
+        function calculateMode(arr) {
+            const frequency = {};
+            let maxFreq = 0;
+            let modes = [];
+
+            arr.forEach(num => {
+                frequency[num] = (frequency[num] || 0) + 1;
+                if (frequency[num] > maxFreq) {
+                    maxFreq = frequency[num];
+                }
+            });
+
+            for (let num in frequency) {
+                if (frequency[num] === maxFreq) {
+                    modes.push(Number(num));
+                }
+            }
+
+            return modes;
         }
 
         // Fetch data from the given URL
@@ -150,7 +213,7 @@
         })
         .then(data => {
             const tableBody = document.getElementById('data-table').querySelector('tbody');
-            tableBody.innerHTML = ''; // Clear existing data
+            tableBody.innerHTML = ''; 
 
             data.forEach(item => {
                 const row = document.createElement('tr');
@@ -170,6 +233,8 @@
                 row.appendChild(datetimeCell);
                 tableBody.appendChild(row);
             });
+
+            calculateStats(); // Calculate stats after loading data
         })
         .catch(error => {
             console.error('There was a problem with the fetch operation:', error);

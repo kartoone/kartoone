@@ -3,145 +3,176 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Data Table</title>
+    <title>Pitch Stats</title>
     <style>
+        .blue {
+            color: #0C2340;
+        }
+
+        .red {
+            color: #BD1F2D;
+        }
+
+        th {
+            border-bottom: 1px solid gray;
+            font-weight: bold;
+            font-size: 1.2em;
+            cursor: pointer; /* Indicate that th is clickable */
+        }
+
+        th.sorted-asc::after {
+            content: " ↑"; /* Ascending sort indicator */
+        }
+
+        th.sorted-desc::after {
+            content: " ↓"; /* Descending sort indicator */
+        }
+
+        a {
+            text-decoration: none;
+        }
+
+        a:hover {
+            text-decoration: underline;
+        }
+
+        h1 {
+            text-align: center;
+        }
+
         table {
             width: 100%;
             border-collapse: collapse;
-            cursor: pointer; /* Indicate that the table headers are clickable */
         }
+
         th, td {
             border: 1px solid #ddd;
             padding: 8px;
-            text-align: left;
         }
+
         th {
             background-color: #f2f2f2;
-        }
-        th.sorted-asc {
-            background-color: #d1e7dd; /* Light green for ascending sort */
-        }
-        th.sorted-desc {
-            background-color: #f8d7da; /* Light red for descending sort */
         }
     </style>
 </head>
 <body>
+    <h1 class="red">Trackman Pitch Stats Viewer</h1>
+    <form onsubmit="filterData(event);">
+        <label>Starting date</label>
+        <input type="date" id="startdate"></input>
+        <label>End date</label>
+        <input type="date" id="enddate"></input>
+        <button>Filter</button>
+    </form>
+    <table id="data-table">
+        <thead>
+            <tr>
+                <th onclick="sortTable(0)">ID</th>
+                <th onclick="sortTable(1)">Speed</th>
+                <th onclick="sortTable(2)">Result</th>
+                <th onclick="sortTable(3)">Datetime</th>
+            </tr>
+        </thead>
+        <tbody>
+            <!-- Data will be inserted here dynamically -->
+        </tbody>
+    </table>
 
-<table id="data-table">
-    <thead>
-        <tr>
-            <th onclick="sortTable(0)">ID</th>
-            <th onclick="sortTable(1)">Speed</th>
-            <th onclick="sortTable(2)">Result</th>
-            <th onclick="sortTable(3)">Datetime</th>
-        </tr>
-    </thead>
-    <tbody>
-        <!-- Data will be populated here -->
-    </tbody>
-</table>
+    <script>
+        function filterData(event) {
+            event.preventDefault();
 
-<script>
-    let tableData = [];
-    let currentSortColumn = null; // Track the current sorted column
-    let currentSortOrder = 'asc';  // Track the sort order
+            var startdate = new Date(document.getElementById("startdate").value);
+            var enddate = new Date(document.getElementById("enddate").value);
+            var tableRows = document.querySelectorAll('#data-table tbody tr');
 
-    async function fetchData() {
-        try {
-            const response = await fetch('https://compute.samford.edu/zohauth/clients/datajson');
-            const data = await response.json();
-            tableData = data; // Store data for sorting
+            tableRows.forEach(row => {
+                var datetimeCell = row.cells[3].textContent; 
+                var rowDate = new Date(datetimeCell);
 
-            populateTable(data);
-        } catch (error) {
-            console.error('Error fetching data:', error);
-        }
-    }
-
-    function populateTable(data) {
-        const tableBody = document.getElementById('data-table').getElementsByTagName('tbody')[0];
-        tableBody.innerHTML = ''; // Clear any existing rows
-
-        data.forEach(item => {
-            const row = document.createElement('tr');
-
-            const idCell = document.createElement('td');
-            idCell.innerHTML = `<a href="details.html?id=${item.id}">Pitch ${item.id}</a>`;
-            row.appendChild(idCell);
-
-            const speedCell = document.createElement('td');
-            speedCell.textContent = item.speed || '--';
-            row.appendChild(speedCell);
-
-            const resultCell = document.createElement('td');
-            resultCell.textContent = item.result || '--';
-            row.appendChild(resultCell);
-
-            const datetimeCell = document.createElement('td');
-            datetimeCell.textContent = item.datetime || '--';
-            row.appendChild(datetimeCell);
-
-            tableBody.appendChild(row);
-        });
-    }
-
-    function sortTable(columnIndex) {
-        const sortedData = [...tableData]; // Create a copy of the original data
-
-        // Determine sort order
-        if (currentSortColumn === columnIndex) {
-            currentSortOrder = currentSortOrder === 'asc' ? 'desc' : 'asc';
-        } else {
-            currentSortOrder = 'asc'; // Default to ascending sort
+                if (rowDate >= startdate && rowDate <= enddate) {
+                    row.style.display = ''; 
+                } else {
+                    row.style.display = 'none'; 
+                }
+            });
         }
 
-        // Sort the data
-        sortedData.sort((a, b) => {
-            let aValue, bValue;
+        let currentSort = { index: -1, order: 'asc' };
 
-            if (columnIndex === 0) { // ID column
-                aValue = a.id;
-                bValue = b.id;
-            } else if (columnIndex === 1) { // Speed column
-                aValue = a.speed;
-                bValue = b.speed;
-            } else if (columnIndex === 2) { // Result column
-                aValue = a.result;
-                bValue = b.result;
-            } else if (columnIndex === 3) { // Datetime column
-                aValue = new Date(a.datetime);
-                bValue = new Date(b.datetime);
+        function sortTable(columnIndex) {
+            const table = document.getElementById('data-table');
+            const tbody = table.querySelector('tbody');
+            const rows = Array.from(tbody.rows);
+            const isAscending = (currentSort.index === columnIndex && currentSort.order === 'asc') ? false : true;
+
+            // Sort rows based on the specified column
+            rows.sort((rowA, rowB) => {
+                const cellA = rowA.cells[columnIndex].textContent;
+                const cellB = rowB.cells[columnIndex].textContent;
+
+                if (columnIndex === 0) { // ID
+                    return isAscending ? cellA.localeCompare(cellB) : cellB.localeCompare(cellA);
+                } else if (columnIndex === 1) { // Speed
+                    return isAscending ? parseFloat(cellA) - parseFloat(cellB) : parseFloat(cellB) - parseFloat(cellA);
+                } else if (columnIndex === 2) { // Result
+                    return isAscending ? cellA.localeCompare(cellB) : cellB.localeCompare(cellA);
+                } else if (columnIndex === 3) { // Datetime
+                    return isAscending ? new Date(cellA) - new Date(cellB) : new Date(cellB) - new Date(cellA);
+                }
+            });
+
+            // Clear and append sorted rows to tbody
+            tbody.innerHTML = '';
+            rows.forEach(row => tbody.appendChild(row));
+
+            // Update current sort state
+            currentSort.index = columnIndex;
+            currentSort.order = isAscending ? 'asc' : 'desc';
+
+            // Reset sort classes
+            Array.from(table.querySelectorAll('th')).forEach(th => {
+                th.classList.remove('sorted-asc', 'sorted-desc');
+            });
+
+            // Add sorting class to the current header
+            table.querySelectorAll('th')[columnIndex].classList.add(isAscending ? 'sorted-asc' : 'sorted-desc');
+        }
+
+        // Fetch data from the given URL
+        fetch('https://compute.samford.edu/zohauth/clients/datajson')
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Network response was not ok');
             }
+            return response.json();
+        })
+        .then(data => {
+            const tableBody = document.getElementById('data-table').querySelector('tbody');
+            tableBody.innerHTML = ''; 
 
-            return currentSortOrder === 'asc' ? (aValue < bValue ? -1 : (aValue > bValue ? 1 : 0)) : (aValue > bValue ? -1 : (aValue < bValue ? 1 : 0));
+            data.forEach(item => {
+                const row = document.createElement('tr');
+                const idCell = document.createElement('td');
+                const speedCell = document.createElement('td');
+                const resultCell = document.createElement('td');
+                const datetimeCell = document.createElement('td');
+
+                idCell.innerHTML = `<a href="details.html?id=${item.id}">Pitch ${item.id}</a>`;
+                speedCell.textContent = item.speed || '--';
+                resultCell.textContent = item.result || '--';
+                datetimeCell.textContent = item.datetime || '--';
+
+                row.appendChild(idCell);
+                row.appendChild(speedCell);
+                row.appendChild(resultCell);
+                row.appendChild(datetimeCell);
+                tableBody.appendChild(row);
+            });
+        })
+        .catch(error => {
+            console.error('There was a problem with the fetch operation:', error);
         });
-
-        // Populate the table with sorted data
-        populateTable(sortedData);
-        
-        // Update sorted column indication
-        updateSortIndicator(columnIndex);
-    }
-
-    function updateSortIndicator(columnIndex) {
-        const headers = document.querySelectorAll('#data-table th');
-        
-        // Clear previous sort indicators
-        headers.forEach((header, index) => {
-            header.classList.remove('sorted-asc', 'sorted-desc');
-            if (index === columnIndex) {
-                header.classList.add(currentSortOrder === 'asc' ? 'sorted-asc' : 'sorted-desc');
-            }
-        });
-
-        // Update the current sorted column
-        currentSortColumn = columnIndex;
-    }
-
-    // Fetch data when the page loads
-    window.onload = fetchData;
-</script>
-
+    </script>
 </body>
 </html>
